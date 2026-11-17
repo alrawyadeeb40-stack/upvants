@@ -12,8 +12,10 @@ const navItems = [
 
 async function searchOpenSources(term) {
   const q = term.trim();
+  const wiki = (language) => fetch('https://' + language + '.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=' + encodeURIComponent(q) + '&gsrlimit=6&prop=extracts%7Cpageimages%7Cinfo&exintro=1&explaintext=1&piprop=thumbnail&pithumbsize=480&inprop=url&format=json&origin=*').then(r => { if (!r.ok) throw new Error('Wikipedia'); return r.json(); }).then(data => Object.values(data.query?.pages || {}).map(p => ({ id:'wiki-'+language+'-'+p.pageid, type:'article', title:p.title, summary:(p.extract||'').slice(0,360), url:p.fullurl || 'https://'+language+'.wikipedia.org/?curid='+p.pageid, source:language === 'ar' ? 'ويكيبيديا العربية' : 'Wikipedia', image:p.thumbnail?.source || '' })));
   const tasks = [
-    fetch('https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=' + encodeURIComponent(q) + '&gsrlimit=6&prop=extracts%7Cpageimages%7Cinfo&exintro=1&explaintext=1&piprop=thumbnail&pithumbsize=480&inprop=url&format=json&origin=*').then(r => { if (!r.ok) throw new Error('Wikipedia'); return r.json(); }).then(data => Object.values(data.query?.pages || {}).map(p => ({ id:'wiki-'+p.pageid, type:'article', title:p.title, summary:(p.extract||'').slice(0,360), url:p.fullurl || 'https://en.wikipedia.org/?curid='+p.pageid, source:'Wikipedia', image:p.thumbnail?.source || '' }))),
+    wiki('ar'),
+    wiki('en'),
     fetch('https://api.gdeltproject.org/api/v2/doc/doc?query=' + encodeURIComponent(q) + '&mode=ArtList&maxrecords=10&format=json&sort=HybridRel').then(r => { if (!r.ok) throw new Error('GDELT'); return r.json(); }).then(data => (data.articles || []).map((a,i) => ({ id:'news-'+i+'-'+a.url, type:'article', title:a.title, summary:[a.domain,a.seendate ? 'تاريخ الرصد: '+a.seendate.slice(0,8) : ''].filter(Boolean).join(' · '), url:a.url, source:a.domain || a.sourceCountry || 'مصدر إخباري', image:a.socialimage || '' })))
   ];
   const settled = await Promise.allSettled(tasks);
