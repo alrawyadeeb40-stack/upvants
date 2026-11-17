@@ -12,16 +12,19 @@ const navItems = [
 
 async function searchOpenSources(term) {
   const q = term.trim();
-  const wiki = (language) => fetch('https://' + language + '.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=' + encodeURIComponent(q) + '&gsrlimit=6&prop=extracts%7Cpageimages%7Cinfo&exintro=1&explaintext=1&piprop=thumbnail&pithumbsize=480&inprop=url&format=json&origin=*').then(r => { if (!r.ok) throw new Error('Wikipedia'); return r.json(); }).then(data => Object.values(data.query?.pages || {}).map(p => ({ id:'wiki-'+language+'-'+p.pageid, type:'article', title:p.title, summary:(p.extract||'').slice(0,360), url:p.fullurl || 'https://'+language+'.wikipedia.org/?curid='+p.pageid, source:language === 'ar' ? 'ويكيبيديا العربية' : 'Wikipedia', image:p.thumbnail?.source || '' })));
-  const tasks = [
-    wiki('ar'),
-    wiki('en'),
-    fetch('https://api.gdeltproject.org/api/v2/doc/doc?query=' + encodeURIComponent(q) + '&mode=ArtList&maxrecords=10&format=json&sort=HybridRel').then(r => { if (!r.ok) throw new Error('GDELT'); return r.json(); }).then(data => (data.articles || []).map((a,i) => ({ id:'news-'+i+'-'+a.url, type:'article', title:a.title, summary:[a.domain,a.seendate ? 'تاريخ الرصد: '+a.seendate.slice(0,8) : ''].filter(Boolean).join(' · '), url:a.url, source:a.domain || a.sourceCountry || 'مصدر إخباري', image:a.socialimage || '' })))
-  ];
-  const settled = await Promise.allSettled(tasks);
-  const results = settled.flatMap(x => x.status === 'fulfilled' ? x.value : []);
-  const unique = [...new Map(results.filter(x=>x.title && x.url).map(x=>[x.url,x])).values()];
-  return { results: unique, errors: settled.filter(x=>x.status==='rejected').length };
+  const url = 'https://api.gdeltproject.org/api/v2/doc/doc?query=' + encodeURIComponent(q) + '&mode=ArtList&maxrecords=25&format=json&sort=HybridRel';
+  const response = await fetch(url);
+  if (!response.ok) throw new Error('News search unavailable');
+  const data = await response.json();
+  const stop = new Set(['من','في','على','عن','الى','إلى','ما','هو','هي','هذا','هذه','مع','كيف','وش','اليوم','أفضل','افضل','the','and','for','with','what','how','today']);
+  const terms = q.toLocaleLowerCase('ar').split(/[\\s،,؟?!]+/).filter(w => w.length > 2 && !stop.has(w));
+  const articles = (data.articles || []).map((a,i) => {
+    const title = (a.title || '').toLocaleLowerCase('ar');
+    const haystack = title + ' ' + (a.domain || '').toLocaleLowerCase('ar');
+    const matches = terms.filter(t => haystack.includes(t)).length;
+    return { id:'news-'+i+'-'+a.url, type:'article', title:a.title, summary:[a.domain,a.seendate ? 'تاريخ النشر: '+a.seendate.slice(0,8) : ''].filter(Boolean).join(' · '), url:a.url, source:a.domain || 'مصدر إخباري', image:a.socialimage || '', matches };
+  }).filter(a => a.title && a.url && (terms.length === 0 || a.matches >= Math.min(2, terms.length)));
+  return { results: [...new Map(articles.map(a=>[a.url,a])).values()], errors: 0 };
 }
 
 const sampleSaved = [
@@ -40,6 +43,7 @@ function App() {
   const [searchResults, setSearchResults] = React.useState([]);
   const [searchLoading, setSearchLoading] = React.useState(false);
   const [searchError, setSearchError] = React.useState('');
+  const [discoveryMode, setDiscoveryMode] = React.useState('read');
   const [saved, setSaved] = React.useState(() => {
     try { return JSON.parse(localStorage.getItem('upvants-saved') || '[]'); } catch { return []; }
   });
@@ -73,6 +77,7 @@ function App() {
     } finally { setSearchLoading(false); }
   };
   const toggleSaved = (item) => setSaved(old => old.some(x => x.id === item.id) ? old.filter(x => x.id !== item.id) : [item, ...old]);
+  const chooseDiscovery = (mode) => { setDiscoveryMode(mode); setSubmittedQuery(query.trim()); setSearchResults([]); setSearchError(mode === 'watch' ? 'عرض الفيديوهات داخل UPVANTS لم يُربط بعد بمصادر الفيديو الرسمية.' : mode === 'reviews' ? 'جمع تجارب وتقييمات المستخدمين لم يُربط بعد بمصادر التقييمات.' : 'اكتب موضوعك في مربع البحث واضغط اكتشف لعرض الأخبار والمقالات المرتبطة به.'); };
   const isSaved = id => saved.some(x => x.id === id);
 
   const renderHome = () => <div className="page-content">
@@ -93,13 +98,13 @@ function App() {
 
     {submittedQuery && <section className="query-panel">
       <div className="query-title"><Sparkles size={18}/><div><b>تم تسجيل بحثك</b><small>«{submittedQuery}»</small></div><button onClick={() => setSubmittedQuery('')} aria-label="إغلاق"><X size={17}/></button></div>
-      <p>{searchLoading ? 'نبحث الآن في المصادر المفتوحة ونرتّب ما وجدناه...' : 'هذه نتائج أولية من مصادر مفتوحة. بعض المنصات مثل YouTube وTikTok وInstagram تتطلب ربط واجهاتها الرسمية قبل عرض نتائجها.'}</p>
+      <p>{searchLoading ? 'نبحث الآن في المصادر المفتوحة ونرتّب ما وجدناه...' : 'نتائج الأخبار والمقالات المرتبطة ببحثك فقط.'}</p>
       {searchLoading && <div className="search-progress"><span/> جارٍ البحث...</div>}
       {!searchLoading && searchError && <div className="search-note">{searchError}</div>}
-      {!searchLoading && searchResults.length > 0 && <div className="results-head"><b>{searchResults.length} نتيجة أولية</b><span>مقالات وأخبار ومراجع</span></div>}
+      {!searchLoading && searchResults.length > 0 && <div className="results-head"><b>{searchResults.length} نتيجة أولية</b><span>أخبار ومقالات</span></div>}
       {!searchLoading && searchResults.length > 0 && <div className="results-list">{searchResults.map(item => <article className="result-card" key={item.id}>
         {item.image && <img src={item.image} alt="" loading="lazy" />}
-        <div className="result-body"><span className="result-source"><BookOpen size={13}/>{item.source}</span><h3>{item.title}</h3><p>{item.summary || 'افتح المصدر لقراءة التفاصيل.'}</p><a href={item.url} target="_blank" rel="noreferrer">قراءة المصدر <ArrowUpRight size={14}/></a></div>
+        <div className="result-body"><span className="result-source"><BookOpen size={13}/>{item.source}</span><h3>{item.title}</h3><p>{item.summary || 'افتح المصدر لقراءة التفاصيل.'}</p><div className="result-actions"><button onClick={() => toggleSaved(item)}>{isSaved(item.id) ? '✓ محفوظ' : 'حفظ'}</button><a href={item.url} target="_blank" rel="noreferrer">قراءة المصدر <ArrowUpRight size={14}/></a></div></div>
       </article>)}</div>}
       {!searchLoading && <div className="platform-note"><b>الفيديوهات والتجارب الاجتماعية</b><span>لم نضف لها نتائج وهمية. نحتاج مفاتيح وواجهات رسمية من المنصات لعرضها داخل التطبيق.</span></div>}
     </section>}
@@ -107,9 +112,9 @@ function App() {
     <section className="section-block">
       <div className="section-heading"><div><span className="eyebrow muted">DISCOVER</span><h2>اكتشف بطريقتك</h2></div><span className="section-sub">كل ما يفيدك، في تجربة واحدة</span></div>
       <div className="discovery-grid">
-        <article className="discovery-card watch"><div className="disc-icon"><Play size={22}/></div><span className="disc-en">WATCH</span><h3>شاهد</h3><p>فيديوهات وشروحات من منصات المحتوى.</p><button onClick={() => setSubmittedQuery(query || 'اكتشاف الفيديوهات')} aria-label="استكشف الفيديوهات"><ChevronLeft/></button></article>
-        <article className="discovery-card read"><div className="disc-icon"><BookOpen size={22}/></div><span className="disc-en">READ</span><h3>اقرأ</h3><p>مقالات وأخبار ومعلومات من مصادر متنوعة.</p><button onClick={() => setSubmittedQuery(query || 'اكتشاف المقالات')} aria-label="استكشف المقالات"><ChevronLeft/></button></article>
-        <article className="discovery-card reviews"><div className="disc-icon"><Star size={22}/></div><span className="disc-en">REAL REVIEWS</span><h3>تجارب وتقييمات</h3><p>آراء وتجارب أشخاص استخدموا المنتجات والخدمات.</p><button onClick={() => setSubmittedQuery(query || 'اكتشاف التجارب والتقييمات')} aria-label="استكشف التجارب"><ChevronLeft/></button></article>
+        <article className="discovery-card watch"><div className="disc-icon"><Play size={22}/></div><span className="disc-en">WATCH</span><h3>شاهد</h3><p>فيديوهات وشروحات من منصات المحتوى.</p><button onClick={() => chooseDiscovery('watch')} aria-label="استكشف الفيديوهات"><ChevronLeft/></button></article>
+        <article className="discovery-card read"><div className="disc-icon"><BookOpen size={22}/></div><span className="disc-en">READ</span><h3>اقرأ</h3><p>مقالات وأخبار ومعلومات من مصادر متنوعة.</p><button onClick={() => chooseDiscovery('read')} aria-label="استكشف المقالات"><ChevronLeft/></button></article>
+        <article className="discovery-card reviews"><div className="disc-icon"><Star size={22}/></div><span className="disc-en">REAL REVIEWS</span><h3>تجارب وتقييمات</h3><p>آراء وتجارب أشخاص استخدموا المنتجات والخدمات.</p><button onClick={() => chooseDiscovery('reviews')} aria-label="استكشف التجارب"><ChevronLeft/></button></article>
       </div>
     </section>
 
