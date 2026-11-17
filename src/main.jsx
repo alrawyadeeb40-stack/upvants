@@ -1,111 +1,137 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { ArrowUpLeft, BookOpen, Compass, Play, Sparkles, Search, Menu, X, ArrowLeft, Lightbulb, Globe2, Users, Star, ExternalLink, MessageSquareText, Video, FileText, Filter, ChevronDown } from 'lucide-react';
+import { Home, Bookmark, Layers3, UserRound, Search, Bell, Play, BookOpen, Star, ChevronLeft, ArrowUpRight, Plus, Clock3, Heart, Settings, LogIn, Menu, X, Sparkles, Eye, MessageCircle, Compass, ShieldCheck } from 'lucide-react';
 import './style.css';
 
-const spaces = [
-  { icon: Play, title: 'شاهد', en: 'WATCH', desc: 'أفضل الفيديوهات والشروحات المرئية من المنصات المختلفة.', tone: 'emerald' },
-  { icon: BookOpen, title: 'اقرأ', en: 'READ', desc: 'مقالات وأدلة ومنشورات مكتوبة من مصادر موثوقة.', tone: 'teal' },
-  { icon: Users, title: 'تجارب حقيقية', en: 'REAL EXPERIENCES', desc: 'آراء من جرّبوا المنتج أو الخدمة أو نفّذوا الفكرة بأنفسهم.', tone: 'mint' },
+const navItems = [
+  { id: 'home', label: 'الرئيسية', icon: Home },
+  { id: 'space', label: 'MY SPACE', icon: Layers3 },
+  { id: 'following', label: 'متابعتي', icon: Compass },
+  { id: 'account', label: 'حسابي', icon: UserRound },
 ];
 
-const sources = [
-  { name: 'YouTube', url: q => 'https://www.youtube.com/results?search_query=' + encodeURIComponent(q), type: 'video' },
-  { name: 'TikTok', url: q => 'https://www.tiktok.com/search?q=' + encodeURIComponent(q), type: 'video' },
-  { name: 'Google فيديو', url: q => 'https://www.google.com/search?tbm=vid&q=' + encodeURIComponent(q), type: 'video' },
-  { name: 'Google مقالات', url: q => 'https://www.google.com/search?q=' + encodeURIComponent(q), type: 'read' },
-  { name: 'Reddit', url: q => 'https://www.reddit.com/search/?q=' + encodeURIComponent(q), type: 'experience' },
-  { name: 'منشورات X', url: q => 'https://x.com/search?q=' + encodeURIComponent(q), type: 'experience' },
-  { name: 'تجارب ومراجعات', url: q => 'https://www.google.com/search?q=' + encodeURIComponent(q + ' تجربة مراجعة تقييم review'), type: 'experience' },
+const sampleSaved = [
+  { id: 1, type: 'video', title: 'كيف تبدأ التصميم الجرافيكي من الصفر؟', source: 'YouTube', meta: 'فيديو تعليمي' },
+  { id: 2, type: 'read', title: 'دليل اختيار المنتج المناسب قبل الشراء', source: 'مقال', meta: 'قراءة محفوظة' },
 ];
+
+function Brand() {
+  return <div className="brand" aria-label="UPVANTS"><span className="brand-symbol"><b>U</b><i>↗</i></span><span>UPVANTS</span></div>;
+}
 
 function App() {
-  const [menuOpen, setMenuOpen] = React.useState(false);
+  const [page, setPage] = React.useState('home');
   const [query, setQuery] = React.useState('');
-  const [activeTab, setActiveTab] = React.useState('all');
-  const [searched, setSearched] = React.useState(false);
+  const [submittedQuery, setSubmittedQuery] = React.useState('');
+  const [saved, setSaved] = React.useState(() => {
+    try { return JSON.parse(localStorage.getItem('upvants-saved') || '[]'); } catch { return []; }
+  });
+  const [history, setHistory] = React.useState(() => {
+    try { return JSON.parse(localStorage.getItem('upvants-history') || '[]'); } catch { return []; }
+  });
+  const [accountMode, setAccountMode] = React.useState('login');
+  const [loginValue, setLoginValue] = React.useState('');
+  const [menuOpen, setMenuOpen] = React.useState(false);
 
-  const search = (event) => {
-    event.preventDefault();
-    if (!query.trim()) return;
-    setSearched(true);
-    setActiveTab('all');
-    document.getElementById('results')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  React.useEffect(() => { localStorage.setItem('upvants-saved', JSON.stringify(saved)); }, [saved]);
+  React.useEffect(() => { localStorage.setItem('upvants-history', JSON.stringify(history)); }, [history]);
+
+  const runSearch = (e) => {
+    e.preventDefault();
+    const value = query.trim();
+    if (!value) return;
+    setSubmittedQuery(value);
+    setHistory(old => [value, ...old.filter(x => x !== value)].slice(0, 20));
+    setPage('home');
   };
+  const toggleSaved = (item) => setSaved(old => old.some(x => x.id === item.id) ? old.filter(x => x.id !== item.id) : [item, ...old]);
+  const isSaved = id => saved.some(x => x.id === id);
 
-  const filteredSources = sources.filter(source => activeTab === 'all' || source.type === activeTab);
-  const reviewQuery = query.trim() + ' تجربة مستخدم تقييم مراجعة بعد الاستخدام';
-  const videoQuery = query.trim() + ' شرح';
-  const readQuery = query.trim() + ' مقال دليل شرح';
-  const sourceQuery = source => source.type === 'video' ? videoQuery : source.type === 'read' ? readQuery : reviewQuery;
+  const renderHome = () => <div className="page-content">
+    <section className="welcome">
+      <div className="welcome-copy">
+        <div className="eyebrow"><span className="live-dot"/> عالمك المعرفي في مكان واحد</div>
+        <h1>وش ودّك <span>تكتشف</span> اليوم؟</h1>
+        <p>اكتب سؤالك أو فكرتك، وUPVANTS يرتّب لك طريق الوصول إلى المعرفة والفيديوهات والتجارب.</p>
+      </div>
+      <div className="welcome-orb"><span>U</span><i>↗</i></div>
+    </section>
 
-  return (
-    <main>
-      <div className="ambient ambient-one" /><div className="ambient ambient-two" />
-      <header className="topbar wrap">
-        <a className="brand" href="#" aria-label="UPVANTS home"><span className="brand-mark">U<span>.</span></span><span>UPVANTS</span></a>
-        <nav className={menuOpen ? 'nav nav-open' : 'nav'}>
-          <a href="#explore">استكشف</a><a href="#spaces">مساحاتنا</a><a href="#about">عن المنصة</a>
-        </nav>
-        <div className="top-actions">
-          <button className="icon-btn search-btn" aria-label="اذهب إلى البحث" onClick={() => document.getElementById('main-search')?.focus()}><Search size={19}/></button>
-          <button className="sign-btn" onClick={() => document.getElementById('main-search')?.focus()}>ابدأ الاستكشاف <ArrowUpLeft size={17}/></button>
-          <button className="icon-btn menu-btn" onClick={() => setMenuOpen(!menuOpen)} aria-label="القائمة">{menuOpen ? <X/> : <Menu/>}</button>
-        </div>
-      </header>
+    <form className="search-box" onSubmit={runSearch}>
+      <Search size={21}/>
+      <input value={query} onChange={e => setQuery(e.target.value)} placeholder="ابحث عن موضوع، سؤال، منتج أو تجربة..." aria-label="بحث"/>
+      <button type="submit">اكتشف <ArrowUpRight size={17}/></button>
+    </form>
+    <div className="suggestions"><span>جرّب:</span>{['أخبار السعودية اليوم','أفضل جوال للتصوير','تعلم التصميم','تجارب الناس مع تيمو'].map(s => <button key={s} onClick={() => setQuery(s)}>{s}</button>)}</div>
 
-      <section className="hero wrap" id="explore">
-        <div className="hero-copy">
-          <div className="eyebrow"><span className="pulse" /> محركك لاكتشاف المعرفة والتجارب</div>
-          <h1>كل ما تبحث عنه،<br/><span>في مكان واحد.</span></h1>
-          <p className="hero-text">اكتب فكرة أو سؤالًا أو منتجًا. نساعدك في الوصول إلى الفيديوهات والمقالات وتجارب الناس لتكوّن صورة أوضح وتتخذ قرارك بثقة.</p>
-          <form className="search-form" onSubmit={search}>
-            <input id="main-search" value={query} onChange={e => setQuery(e.target.value)} placeholder="مثلاً: أريد تعلم التصميم، هل هذا المنتج فخم؟" aria-label="اكتب ما تريد اكتشافه"/>
-            <button type="submit" aria-label="ابحث"><Search size={22}/></button>
-            <Sparkles className="search-spark" size={20}/>
-          </form>
-          <div className="search-hints"><span>جرّب:</span><button onClick={() => setQuery('تعلم التصميم الجرافيكي من الصفر')}>تعلم التصميم</button><button onClick={() => setQuery('تقييم جودة وفخامة هذا المنتج')}>تقييم منتج</button><button onClick={() => setQuery('كيف أبدأ مشروعًا صغيرًا')}>بدء مشروع</button></div>
-          <div className="hero-note"><Sparkles size={15}/> معرفة أوسع، وتجارب أقرب للواقع.</div>
-        </div>
-        <div className="hero-art" aria-label="هوية UPVANTS">
-          <div className="orbit orbit-a" /><div className="orbit orbit-b" />
-          <div className="core"><span>U</span><i /></div>
-          <div className="float-card card-top"><Globe2 size={17}/><span>مصادر متعددة</span></div>
-          <div className="float-card card-bottom"><Lightbulb size={17}/><span>من السؤال إلى القرار</span></div>
-          <div className="spark spark-a">✳</div><div className="spark spark-b">✦</div>
-        </div>
-      </section>
+    {submittedQuery && <section className="query-panel">
+      <div className="query-title"><Sparkles size={18}/><div><b>بحثك جاهز للاستكشاف</b><small>«{submittedQuery}»</small></div><button onClick={() => setSubmittedQuery('')} aria-label="إغلاق"><X size={17}/></button></div>
+      <p>واجهة البحث الجديدة قيد التجهيز. هدفنا عرض النتائج هنا داخل UPVANTS، مع تضمين الفيديو أو فتح المصدر فقط عند تعذّر عرضه.</p>
+      <div className="query-types"><button onClick={() => setPage('home')}><Play size={16}/> فيديوهات</button><button><BookOpen size={16}/> مقالات</button><button><Star size={16}/> تجارب وتقييمات</button></div>
+    </section>}
 
-      {searched && <section className="results wrap" id="results">
-        <div className="results-head"><div><div className="eyebrow muted">YOUR DISCOVERY</div><h2>نتائج البحث عن: <span>{query}</span></h2></div><button className="clear-btn" onClick={() => setSearched(false)}>إغلاق <X size={16}/></button></div>
-        <div className="results-note"><Sparkles size={18}/><div><strong>استكشف المصادر المرتبطة ببحثك</strong><p>هذه النسخة تفتح عمليات بحث موجهة داخل المصادر. تجميع النتائج وترتيبها داخل UPVANTS تلقائيًا يحتاج ربط واجهات المصادر ومحرك البحث في المرحلة التالية.</p></div></div>
-        <div className="filter-tabs">
-          <button className={activeTab === 'all' ? 'active' : ''} onClick={() => setActiveTab('all')}>الكل</button>
-          <button className={activeTab === 'video' ? 'active' : ''} onClick={() => setActiveTab('video')}><Video size={15}/> شاهد</button>
-          <button className={activeTab === 'read' ? 'active' : ''} onClick={() => setActiveTab('read')}><FileText size={15}/> اقرأ</button>
-          <button className={activeTab === 'experience' ? 'active' : ''} onClick={() => setActiveTab('experience')}><Users size={15}/> تجارب حقيقية</button>
-        </div>
-        <div className="source-grid">{filteredSources.map(source => <a className="source-card" key={source.name} href={source.url(sourceQuery(source))} target="_blank" rel="noreferrer"><span className="source-icon">{source.type === 'video' ? <Play size={19}/> : source.type === 'read' ? <BookOpen size={19}/> : <Star size={19}/>}</span><span><strong>{source.name}</strong><small>{source.type === 'video' ? 'ابحث عن فيديوهات وشروحات' : source.type === 'read' ? 'ابحث عن مقالات ومصادر مكتوبة' : 'ابحث عن آراء وتجارب المستخدمين'}</small></span><ExternalLink size={16}/></a>)}</div>
-      </section>}
+    <section className="section-block">
+      <div className="section-heading"><div><span className="eyebrow muted">DISCOVER</span><h2>اكتشف بطريقتك</h2></div><span className="section-sub">كل ما يفيدك، في تجربة واحدة</span></div>
+      <div className="discovery-grid">
+        <article className="discovery-card watch"><div className="disc-icon"><Play size={22}/></div><span className="disc-en">WATCH</span><h3>شاهد</h3><p>فيديوهات وشروحات من منصات المحتوى.</p><button onClick={() => setSubmittedQuery(query || 'اكتشاف الفيديوهات')} aria-label="استكشف الفيديوهات"><ChevronLeft/></button></article>
+        <article className="discovery-card read"><div className="disc-icon"><BookOpen size={22}/></div><span className="disc-en">READ</span><h3>اقرأ</h3><p>مقالات وأخبار ومعلومات من مصادر متنوعة.</p><button onClick={() => setSubmittedQuery(query || 'اكتشاف المقالات')} aria-label="استكشف المقالات"><ChevronLeft/></button></article>
+        <article className="discovery-card reviews"><div className="disc-icon"><Star size={22}/></div><span className="disc-en">REAL REVIEWS</span><h3>تجارب وتقييمات</h3><p>آراء وتجارب أشخاص استخدموا المنتجات والخدمات.</p><button onClick={() => setSubmittedQuery(query || 'اكتشاف التجارب والتقييمات')} aria-label="استكشف التجارب"><ChevronLeft/></button></article>
+      </div>
+    </section>
 
-      <section className="explore wrap" id="explore-spaces">
-        <div className="section-head"><div><div className="eyebrow muted">YOUR NEXT STEP</div><h2>اختر طريق اكتشافك</h2></div><p>ثلاث مساحات، وهدف واحد:<br/>أن تصل إلى معرفة تفيدك.</p></div>
-        <div className="area-grid" id="spaces">
-          {spaces.map(({icon: Icon, title, en, desc, tone}, i) => <article className={'area-card ' + tone} key={en}>
-            <div className="area-top"><span className="area-icon"><Icon size={22}/></span><span className="area-number">0{i+1}</span></div>
-            <div><div className="area-en">{en}</div><h3>{title}</h3><p>{desc}</p></div>
-            <button className="card-link" aria-label={'ابحث في ' + title} onClick={() => {setActiveTab(i === 0 ? 'video' : i === 1 ? 'read' : 'experience'); document.getElementById('main-search')?.focus(); document.getElementById('explore')?.scrollIntoView({behavior:'smooth'});}}><ArrowUpLeft size={19}/></button>
-          </article>)}
-        </div>
-      </section>
+    <section className="section-block">
+      <div className="section-heading"><div><span className="eyebrow muted">YOUR SPACE</span><h2>مساحتك الخاصة</h2></div><button className="text-link" onClick={() => setPage('space')}>افتح MY SPACE <ChevronLeft size={16}/></button></div>
+      <div className="space-preview">
+        <div className="preview-icon"><Bookmark size={23}/></div>
+        <div className="preview-copy"><b>احفظ كل ما يهمك</b><span>اجمع الفيديوهات والمقالات والتجارب في مكان ترجع له بأي وقت.</span></div>
+        <button className="outline-btn" onClick={() => setPage('space')}>محفوظاتك <ChevronLeft size={16}/></button>
+      </div>
+    </section>
+  </div>;
 
-      <section className="vanta wrap" id="about">
-        <div className="vanta-icon"><Sparkles size={28}/></div>
-        <div className="vanta-copy"><div className="eyebrow muted">MEET YOUR THINKING SPACE</div><h2>فكّر بشكل أوسع مع <span>VANTA</span></h2><p>مساحة ذكية لمساعدتك على ترتيب أفكارك، طرح الأسئلة، واستكشاف احتمالات جديدة. نعمل على بناء التجربة لتكون رفيقك في رحلة التعلّم والإنجاز.</p></div>
-        <button className="vanta-btn" onClick={() => alert('قريبًا — نعمل على تجهيز VANTA.')}>اكتشف VANTA <ArrowUpLeft size={17}/></button>
-      </section>
-      <footer className="footer wrap"><a className="brand" href="#"><span className="brand-mark">U<span>.</span></span><span>UPVANTS</span></a><span>© 2026 UPVANTS. بداية عالمك.</span><span className="footer-tag">THINK BEYOND.</span></footer>
-    </main>
-  );
+  const renderSpace = () => <div className="page-content inner-page">
+    <div className="page-title"><span className="eyebrow muted">YOUR PERSONAL SPACE</span><h1>MY SPACE</h1><p>مساحتك الخاصة لكل ما تريد الاحتفاظ به والعودة إليه.</p></div>
+    <div className="space-stats"><div><Bookmark/><b>{saved.length}</b><span>عنصر محفوظ</span></div><div><Clock3/><b>{history.length}</b><span>عملية بحث</span></div><div><Heart/><b>—</b><span>قوائمك</span></div></div>
+    <section className="section-block"><div className="section-heading"><div><h2>المحفوظات</h2><span className="section-sub">كل ما حفظته في مكان واحد</span></div></div>
+      {saved.length ? <div className="saved-list">{saved.map(item => <div className="saved-item" key={item.id}><div className="saved-type">{item.type === 'video' ? <Play/> : <BookOpen/>}</div><div className="saved-copy"><b>{item.title}</b><span>{item.source} · {item.meta}</span></div><button onClick={() => toggleSaved(item)} aria-label="إزالة من المحفوظات"><Bookmark fill="currentColor"/></button></div>)}</div> : <div className="empty-state"><Bookmark size={28}/><b>محفوظاتك بتكون هنا</b><p>لما تشوف محتوى يعجبك، اضغط حفظ عشان تلقاه هنا بسهولة.</p></div>}
+    </section>
+    <section className="section-block"><div className="section-heading"><div><h2>آخر عمليات البحث</h2><span className="section-sub">عمليات البحث السابقة على هذا الجهاز</span></div></div>
+      {history.length ? <div className="history-list">{history.map((item,i)=><button key={i} onClick={()=>{setQuery(item);setSubmittedQuery(item);setPage('home')}}><Clock3 size={16}/>{item}<ChevronLeft size={16}/></button>)}</div> : <div className="empty-state compact"><p>ما عندك عمليات بحث سابقة للحين.</p></div>}
+    </section>
+  </div>;
+
+  const renderFollowing = () => <div className="page-content inner-page">
+    <div className="page-title"><span className="eyebrow muted">YOUR FEED</span><h1>متابعتي</h1><p>تابع المواضيع والمصادر التي تهمك، واجمع جديدها في مكان واحد.</p></div>
+    <div className="empty-state following-empty"><Compass size={32}/><b>خلّ اهتماماتك تقود اكتشافك</b><p>قريبًا تقدر تتابع موضوعًا أو منصة أو مجالًا، وتشوف أحدث المحتوى المرتبط به هنا.</p><button className="outline-btn" onClick={()=>setPage('home')}>ابدأ من الرئيسية <ChevronLeft size={16}/></button></div>
+  </div>;
+
+  const renderAccount = () => <div className="page-content inner-page account-page">
+    <div className="account-card">
+      <div className="account-symbol"><UserRound size={30}/></div>
+      <span className="eyebrow muted">YOUR UPVANTS ACCOUNT</span>
+      <h1>{accountMode === 'login' ? 'أهلًا بعودتك' : 'انضم إلى UPVANTS'}</h1>
+      <p>سجّل دخولك عشان تحفظ اهتماماتك ومحتواك وتزامنها مع حسابك.</p>
+      <div className="auth-switch"><button className={accountMode==='login'?'active':''} onClick={()=>setAccountMode('login')}>تسجيل الدخول</button><button className={accountMode==='signup'?'active':''} onClick={()=>setAccountMode('signup')}>إنشاء حساب</button></div>
+      <label htmlFor="account-input">البريد الإلكتروني أو رقم الجوال</label>
+      <input id="account-input" className="auth-input" value={loginValue} onChange={e=>setLoginValue(e.target.value)} placeholder="أدخل البريد أو رقم الجوال"/>
+      <button className="auth-submit" onClick={()=>alert('واجهة الحساب جاهزة مبدئيًا. سيتم تفعيل التحقق والرسائل بعد ربط خدمة المصادقة الآمنة.')}>{accountMode==='login'?'متابعة':'إنشاء حساب'} <ChevronLeft size={17}/></button>
+      <div className="privacy-note"><ShieldCheck size={15}/> حسابك ومحتواك الخاص يبقى لك.</div>
+      <small className="auth-hint">التسجيل والتحقق الفعلي يحتاج ربط خدمة حسابات آمنة قبل إطلاقه للمستخدمين.</small>
+    </div>
+  </div>;
+
+  return <div className="app-shell">
+    <header className="app-header">
+      <button className="mobile-menu" onClick={()=>setMenuOpen(!menuOpen)} aria-label="القائمة">{menuOpen?<X/>:<Menu/>}</button>
+      <Brand/>
+      <div className="header-center"><span className="status-dot"/> اكتشف أكثر، وتشتّت أقل</div>
+      <button className="header-bell" aria-label="الإشعارات"><Bell size={19}/></button>
+    </header>
+    {menuOpen && <div className="mobile-nav">{navItems.map(item=><button key={item.id} onClick={()=>{setPage(item.id);setMenuOpen(false)}}>{item.label}</button>)}</div>}
+    <main className="app-main">{page==='home'?renderHome():page==='space'?renderSpace():page==='following'?renderFollowing():renderAccount()}</main>
+    <nav className="bottom-nav" aria-label="التنقل الرئيسي">{navItems.map(item=>{const Icon=item.icon;return <button key={item.id} className={page===item.id?'active':''} onClick={()=>setPage(item.id)}><Icon size={21}/><span>{item.label}</span></button>})}</nav>
+    <footer className="app-footer"><Brand/><span>UPVANTS · اكتشف عالمك</span></footer>
+  </div>;
 }
-createRoot(document.getElementById('root')).render(<App />);
+
+createRoot(document.getElementById('root')).render(<App/>);
