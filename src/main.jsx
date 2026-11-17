@@ -62,12 +62,10 @@ function App() {
       <input value={query} onChange={e => setQuery(e.target.value)} placeholder="ابحث عن موضوع، سؤال، منتج أو تجربة..." aria-label="بحث"/>
       <button type="submit">اكتشف <ArrowUpRight size={17}/></button>
     </form>
-    <div className="suggestions"><span>جرّب:</span>{['أخبار السعودية اليوم','أفضل جوال للتصوير','تعلم التصميم','تجارب الناس مع تيمو'].map(s => <button key={s} onClick={() => setQuery(s)}>{s}</button>)}</div>
 
     {submittedQuery && <section className="query-panel">
-      <div className="query-title"><Sparkles size={18}/><div><b>بحثك جاهز للاستكشاف</b><small>«{submittedQuery}»</small></div><button onClick={() => setSubmittedQuery('')} aria-label="إغلاق"><X size={17}/></button></div>
-      <p>واجهة البحث الجديدة قيد التجهيز. هدفنا عرض النتائج هنا داخل UPVANTS، مع تضمين الفيديو أو فتح المصدر فقط عند تعذّر عرضه.</p>
-      <div className="query-types"><button onClick={() => setPage('home')}><Play size={16}/> فيديوهات</button><button><BookOpen size={16}/> مقالات</button><button><Star size={16}/> تجارب وتقييمات</button></div>
+      <div className="query-title"><Sparkles size={18}/><div><b>تم تسجيل بحثك</b><small>«{submittedQuery}»</small></div><button onClick={() => setSubmittedQuery('')} aria-label="إغلاق"><X size={17}/></button></div>
+      <p>لم تظهر نتائج لأن محرك البحث وجلب المحتوى من المنصات لم يُربطا بعد. هذه الواجهة لا تجلب نتائج فعلية حاليًا. نعمل على ربط مصادر البحث حتى تظهر الفيديوهات والمقالات والتجارب هنا داخل UPVANTS.</p>
     </section>}
 
     <section className="section-block">
