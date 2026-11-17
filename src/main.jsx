@@ -61,6 +61,12 @@ function App() {
     e.preventDefault();
     const value = query.trim();
     if (!value || searchLoading) return;
+    if (discoveryMode !== 'read') {
+      setSubmittedQuery(value);
+      setSearchResults([]);
+      setSearchError(discoveryMode === 'watch' ? 'الفيديوهات لم تُربط بعد بواجهات YouTube وTikTok وغيرها، لذلك لا توجد نتائج فيديو حقيقية الآن.' : 'مصادر التجارب والتقييمات لم تُربط بعد. لن نعرض آراء أو تقييمات غير موثقة.');
+      return;
+    }
     setSubmittedQuery(value);
     setSearchResults([]);
     setSearchError('');
@@ -77,7 +83,13 @@ function App() {
     } finally { setSearchLoading(false); }
   };
   const toggleSaved = (item) => setSaved(old => old.some(x => x.id === item.id) ? old.filter(x => x.id !== item.id) : [item, ...old]);
-  const chooseDiscovery = (mode) => { setDiscoveryMode(mode); setSubmittedQuery(query.trim()); setSearchResults([]); setSearchError(mode === 'watch' ? 'عرض الفيديوهات داخل UPVANTS لم يُربط بعد بمصادر الفيديو الرسمية.' : mode === 'reviews' ? 'جمع تجارب وتقييمات المستخدمين لم يُربط بعد بمصادر التقييمات.' : 'اكتب موضوعك في مربع البحث واضغط اكتشف لعرض الأخبار والمقالات المرتبطة به.'); };
+  const chooseDiscovery = (mode) => {
+    setDiscoveryMode(mode);
+    setSubmittedQuery(query.trim() || (mode === 'watch' ? 'استكشاف الفيديوهات' : mode === 'reviews' ? 'استكشاف التجارب والتقييمات' : 'استكشاف المقالات'));
+    setSearchResults([]);
+    setSearchError(mode === 'watch' ? 'الفيديوهات لم تُربط بعد بواجهات YouTube وTikTok وغيرها، لذلك لا توجد نتائج فيديو حقيقية الآن.' : mode === 'reviews' ? 'مصادر التجارب والتقييمات لم تُربط بعد. لن نعرض آراء أو تقييمات غير موثقة.' : 'اكتب موضوعك في مربع البحث واضغط اكتشف لعرض الأخبار والمقالات المرتبطة به.');
+    if (mode === 'read' && query.trim()) runSearch({ preventDefault: () => {} });
+  };
   const isSaved = id => saved.some(x => x.id === id);
 
   const renderHome = () => <div className="page-content">
