@@ -10,6 +10,18 @@ const navItems = [
   { id: 'account', label: 'حسابي', icon: UserRound },
 ];
 
+async function searchOpenSources(term) {
+  const q = term.trim();
+  const tasks = [
+    fetch('https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=' + encodeURIComponent(q) + '&gsrlimit=6&prop=extracts%7Cpageimages%7Cinfo&exintro=1&explaintext=1&piprop=thumbnail&pithumbsize=480&inprop=url&format=json&origin=*').then(r => { if (!r.ok) throw new Error('Wikipedia'); return r.json(); }).then(data => Object.values(data.query?.pages || {}).map(p => ({ id:'wiki-'+p.pageid, type:'article', title:p.title, summary:(p.extract||'').slice(0,360), url:p.fullurl || 'https://en.wikipedia.org/?curid='+p.pageid, source:'Wikipedia', image:p.thumbnail?.source || '' }))),
+    fetch('https://api.gdeltproject.org/api/v2/doc/doc?query=' + encodeURIComponent(q) + '&mode=ArtList&maxrecords=10&format=json&sort=HybridRel').then(r => { if (!r.ok) throw new Error('GDELT'); return r.json(); }).then(data => (data.articles || []).map((a,i) => ({ id:'news-'+i+'-'+a.url, type:'article', title:a.title, summary:[a.domain,a.seendate ? 'تاريخ الرصد: '+a.seendate.slice(0,8) : ''].filter(Boolean).join(' · '), url:a.url, source:a.domain || a.sourceCountry || 'مصدر إخباري', image:a.socialimage || '' })))
+  ];
+  const settled = await Promise.allSettled(tasks);
+  const results = settled.flatMap(x => x.status === 'fulfilled' ? x.value : []);
+  const unique = [...new Map(results.filter(x=>x.title && x.url).map(x=>[x.url,x])).values()];
+  return { results: unique, errors: settled.filter(x=>x.status==='rejected').length };
+}
+
 const sampleSaved = [
   { id: 1, type: 'video', title: 'كيف تبدأ التصميم الجرافيكي من الصفر؟', source: 'YouTube', meta: 'فيديو تعليمي' },
   { id: 2, type: 'read', title: 'دليل اختيار المنتج المناسب قبل الشراء', source: 'مقال', meta: 'قراءة محفوظة' },
@@ -23,6 +35,9 @@ function App() {
   const [page, setPage] = React.useState('home');
   const [query, setQuery] = React.useState('');
   const [submittedQuery, setSubmittedQuery] = React.useState('');
+  const [searchResults, setSearchResults] = React.useState([]);
+  const [searchLoading, setSearchLoading] = React.useState(false);
+  const [searchError, setSearchError] = React.useState('');
   const [saved, setSaved] = React.useState(() => {
     try { return JSON.parse(localStorage.getItem('upvants-saved') || '[]'); } catch { return []; }
   });
@@ -36,13 +51,24 @@ function App() {
   React.useEffect(() => { localStorage.setItem('upvants-saved', JSON.stringify(saved)); }, [saved]);
   React.useEffect(() => { localStorage.setItem('upvants-history', JSON.stringify(history)); }, [history]);
 
-  const runSearch = (e) => {
+  const runSearch = async (e) => {
     e.preventDefault();
     const value = query.trim();
-    if (!value) return;
+    if (!value || searchLoading) return;
     setSubmittedQuery(value);
+    setSearchResults([]);
+    setSearchError('');
+    setSearchLoading(true);
     setHistory(old => [value, ...old.filter(x => x !== value)].slice(0, 20));
     setPage('home');
+    try {
+      const data = await searchOpenSources(value);
+      setSearchResults(data.results);
+      if (!data.results.length) setSearchError('لم نجد نتائج من المصادر المفتوحة لهذه العبارة. جرّب صياغة أخرى.');
+      else if (data.errors) setSearchError('بعض مصادر البحث لم تستجب، لذلك قد تكون النتائج غير مكتملة.');
+    } catch {
+      setSearchError('تعذّر الاتصال بمصادر البحث. تأكد من الإنترنت وحاول مرة ثانية.');
+    } finally { setSearchLoading(false); }
   };
   const toggleSaved = (item) => setSaved(old => old.some(x => x.id === item.id) ? old.filter(x => x.id !== item.id) : [item, ...old]);
   const isSaved = id => saved.some(x => x.id === id);
@@ -65,7 +91,15 @@ function App() {
 
     {submittedQuery && <section className="query-panel">
       <div className="query-title"><Sparkles size={18}/><div><b>تم تسجيل بحثك</b><small>«{submittedQuery}»</small></div><button onClick={() => setSubmittedQuery('')} aria-label="إغلاق"><X size={17}/></button></div>
-      <p>لم تظهر نتائج لأن محرك البحث وجلب المحتوى من المنصات لم يُربطا بعد. هذه الواجهة لا تجلب نتائج فعلية حاليًا. نعمل على ربط مصادر البحث حتى تظهر الفيديوهات والمقالات والتجارب هنا داخل UPVANTS.</p>
+      <p>{searchLoading ? 'نبحث الآن في المصادر المفتوحة ونرتّب ما وجدناه...' : 'هذه نتائج أولية من مصادر مفتوحة. بعض المنصات مثل YouTube وTikTok وInstagram تتطلب ربط واجهاتها الرسمية قبل عرض نتائجها.'}</p>
+      {searchLoading && <div className="search-progress"><span/> جارٍ البحث...</div>}
+      {!searchLoading && searchError && <div className="search-note">{searchError}</div>}
+      {!searchLoading && searchResults.length > 0 && <div className="results-head"><b>{searchResults.length} نتيجة أولية</b><span>مقالات وأخبار ومراجع</span></div>}
+      {!searchLoading && searchResults.length > 0 && <div className="results-list">{searchResults.map(item => <article className="result-card" key={item.id}>
+        {item.image && <img src={item.image} alt="" loading="lazy" />}
+        <div className="result-body"><span className="result-source"><BookOpen size={13}/>{item.source}</span><h3>{item.title}</h3><p>{item.summary || 'افتح المصدر لقراءة التفاصيل.'}</p><a href={item.url} target="_blank" rel="noreferrer">قراءة المصدر <ArrowUpRight size={14}/></a></div>
+      </article>)}</div>}
+      {!searchLoading && <div className="platform-note"><b>الفيديوهات والتجارب الاجتماعية</b><span>لم نضف لها نتائج وهمية. نحتاج مفاتيح وواجهات رسمية من المنصات لعرضها داخل التطبيق.</span></div>}
     </section>}
 
     <section className="section-block">
